@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { correctMnemonic } from '../utils/correct-mnemonic';
 import { ChainInfo, CreateWalletParams, Key, Keystore, WALLETTYPE } from '../types/keychain';
 import { compressedPublicKey, generateWalletFromMnemonic, generateWalletsFromMnemonic } from '../key/wallet-utils';
+import { Wallet } from '../key/wallet';
 
 export const KEYCHAIN = 'keystore';
 export const ENCRYPTED_KEYCHAIN = 'encrypted-keystore';
@@ -185,16 +186,24 @@ export class KeyChain {
     count: number,
     coinType: string,
     addressPrefix: string,
-  ): Promise<{ address: string; index: number; pubkey: Uint8Array | null }[]> {
+    privKeysMode: boolean = false,
+  ): Promise<{ address: string; index: number; pubkey: Uint8Array | null; childKey?: any }[]> {
     const correctedMnemonic = correctMnemonic(mnemonic);
     const holder = new Array(count).fill(0);
     const hdPaths = holder.map((_, v) => getHDPath(coinType, v.toString()));
-
+  
     const generatedWallet = await generateWalletsFromMnemonic(correctedMnemonic, hdPaths, addressPrefix);
-    const accounts = generatedWallet
-      .getAccounts()
-      .map((account, index) => ({ address: account.address, pubkey: account.pubkey, index }));
-
+    let accounts;
+    if (privKeysMode && generatedWallet instanceof Wallet) {
+      accounts = generatedWallet
+        .getAccountsWithPrivKey()
+        .map((account, index) => ({ address: account.address, pubkey: account.pubkey, childKey: account.childKey, index }));
+    } else {
+      accounts = generatedWallet
+        .getAccounts()
+        .map((account, index) => ({ address: account.address, pubkey: account.pubkey, index }));
+    }
+  
     return accounts.sort((a, b) => a.index - b.index);
   }
 
